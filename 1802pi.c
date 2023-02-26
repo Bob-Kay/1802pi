@@ -1,4 +1,3 @@
-// Connect 1802 Vcc to 3.3v. Vdd to 5v, and Vss to ground
 
 #include <stdio.h>
 #include <stdlib.h>
