@@ -7,7 +7,6 @@
     s_sync for select()
 */
 
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
