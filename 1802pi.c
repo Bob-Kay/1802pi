@@ -1,12 +1,5 @@
 // Connect 1802 Vcc to 3.3v. Vdd to 5v, and Vss to ground
 
-/*
-    Define sync as one of:
-    a_sync for clock_nanosleep() absolute time
-    r_sync for clock_nanosleep() relative time
-    s_sync for select()
-*/
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
