@@ -21,6 +21,7 @@ From the CLI command line, issue this command:
 where options are:
 
     -b <binaryfile>    load binary file
+    -d                 Dump 256 bytes of 1802 memory at end of program
     -f <file>          load file, see format below
     -h <hexfile>       load Intel hex format file
     -H help            Print help message and exit
