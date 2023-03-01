@@ -565,7 +565,7 @@ void show_help( const char *name )
     puts( "  -b file   Load binary file into 1802 memory" );
     puts( "  -d        Dump 256 bytes of 1802 memory at end of program" );
     puts( "  -f file   Load file into 1802 memory" );
-    puts( "  -h file   Load Intel hex fileinto1802 memory" );
+    puts( "  -h file   Load Intel hex file into 1802 memory" );
     puts( "  -H        Show this help" );
     puts( "  -n        Max clock cycles to execute" );
     puts( "  -s speed  Set clock speed to speed" );
