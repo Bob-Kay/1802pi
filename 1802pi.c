@@ -75,9 +75,11 @@ typedef unsigned char boolean;
 // struct { time_t tv_sec, longtv_usec } timeval;
 
 // Global variables
+int clocks;								// number of clock ccycles done
 int clocks_per_second = 1000;
 boolean dump_flag;
 uint16_t mem_addr;
+int max_clocks = 2000;					// max clocks to perform
 struct timespec timeCycle;				// Duration of a half clock cycle;
 struct timespec timeMark;				// Time of last clock edge
 
@@ -120,7 +122,7 @@ int main( int argc, char *argv[] )
     for ( int i = 0; i < 32; i++ )
         clockPulse( );
 
-    for ( int i = 0; i < 2000; i++ ) // Loop for 2000 (terminate with Ctrl-C)
+    for ( clocks = 0; clocks < max_clocks; clocks++ )
     {
         csync( );
         digitalWrite( nClock, HIGH );
@@ -187,7 +189,7 @@ void get_options( int argc, char **argv )
     else
         binname = argv[0];
 
-    while ( ( option = getopt( argc, argv, "b:df:h:Hs:v" ) ) != EOF )
+    while ( ( option = getopt( argc, argv, "b:df:h:Hn:s:v" ) ) != EOF )
     {
         switch( option )
         {
@@ -208,6 +210,14 @@ void get_options( int argc, char **argv )
                 {
                     show_help( binname );
                     fHelp = TRUE;
+                }
+                break;
+            case 'n':
+                max_clocks = atoi( optarg );
+                if ( max_clocks < 1 )
+                {
+                    fputs( "Bad value for max clocks\n", stderr );
+                    exit( EXIT_FAILURE );
                 }
                 break;
             case 'v':
@@ -381,8 +391,9 @@ int load_hex( const char *fname )
     while ( ( fgets( buf, sizeof( buf), fp ) ) != NULL )
     {
         puts( buf );
-        if ( buf[0] == '#' )	// Extension to spec:
-            continue;			// Allow comments prefixed by '#'
+        // Extension to spec: Allow comments prefixed by '# or ';'
+        if ( buf[0] == '#' || buf[0] == ';' )
+            continue;
         csum = 0;
         count = 0;
         addr = 0;
@@ -556,6 +567,7 @@ void show_help( const char *name )
     puts( "  -f file   Load file into 1802 memory" );
     puts( "  -h file   Load Intel hex fileinto1802 memory" );
     puts( "  -H        Show this help" );
+    puts( "  -n        Max clock cycles to execute" );
     puts( "  -s speed  Set clock speed to speed" );
     puts( "  -v        Show version information" );
 }
