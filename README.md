@@ -6,7 +6,10 @@ to a COSMAC 1802 processor chip.  It can be used for very low level analysis of 
 while running an 1802 program.
 
 This is a sister project of Bob Kucxewski's 1802/Raspberry Pi project.
-see https://github.com/BobKuczewski/Run1802.git
+see https://github.com/BobKuczewski/Run1802.git  Discussion of these projects, and just about
+anything related to the RCA Cosmac 1802 processor family, can be found att
+https://groups.io/g/cosmacelf
+
 ## Hardware
 All that's needed is an 1802 chip, a Raspberry Pi, and a breadboard/circuit board with the
 interconnections.  Power for the 1802 is supplied by the Pi.  Since the 1802 has a very low
