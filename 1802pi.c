@@ -76,6 +76,7 @@ typedef unsigned char boolean;
 
 // Global variables
 int clocks_per_second = 1000;
+boolean dump_flag;
 uint16_t mem_addr;
 struct timespec timeCycle;				// Duration of a half clock cycle;
 struct timespec timeMark;				// Time of last clock edge
@@ -89,6 +90,7 @@ int exec_cycle( void );					// Execute one machine cucle (8 clocks)
 void get_options( int argc, char **argv ); // Get command line args
 void init_1802_pins( void );			// Initialize 1802 pins
 int load_binary( const char *fname ); 	// Load a binary file
+int load_from_command( const char *code );  // load from command line
 int load_file( const char *fname );		// Load a data file
 int load_hex( const char *fname );		// Load an Intel hex file
 int next_byte( const char *p );			// Get bext ASCII hex byte from string
@@ -108,6 +110,8 @@ int main( int argc, char *argv[] )
 
     get_options( argc, argv );
 
+    if ( optind < argc )	// get code in command line tail
+        load_from_command( argv[optind] );        
     timeCycle.tv_sec = 0;
     timeCycle.tv_nsec = 1000000000 / ( clocks_per_second * 2 );
     clock_gettime( CLOCK_MONOTONIC, &timeMark );	// Set starting time for clock timer
@@ -116,7 +120,7 @@ int main( int argc, char *argv[] )
     for ( int i = 0; i < 32; i++ )
         clockPulse( );
 
-    for ( int i = 0; i < 1000; i++ ) // Loop forever (terminate with Ctrl-C)
+    for ( int i = 0; i < 2000; i++ ) // Loop for 2000 (terminate with Ctrl-C)
     {
         csync( );
         digitalWrite( nClock, HIGH );
@@ -125,7 +129,8 @@ int main( int argc, char *argv[] )
 //        puts( "Tick!" );
     }    
 
-    ramdump( 0, 256 );
+    if ( dump_flag )
+        ramdump( 0, 256 );
 
     exit( EXIT_SUCCESS );
 }
@@ -182,12 +187,15 @@ void get_options( int argc, char **argv )
     else
         binname = argv[0];
 
-    while ( ( option = getopt( argc, argv, "b:f:h:Hs:v" ) ) != EOF )
+    while ( ( option = getopt( argc, argv, "b:df:h:Hs:v" ) ) != EOF )
     {
         switch( option )
         {
             case 'b':
                 load_binary( optarg );
+                break;
+            case 'd':
+                dump_flag = TRUE;
                 break;
             case 'f':
                 load_file( optarg );
@@ -261,6 +269,39 @@ int load_binary( const char *fname )
         elfram[addr++] = c;
 
     fclose( fp );    
+    return 0;
+}
+
+int load_from_command( const char *code )
+{
+    int hi;
+    int lo;
+
+    while( *code != '\0' )
+    {
+        if ( isspace( *code ) )
+            continue;
+        hi = asxhex( *code );
+        if ( hi < 0 )
+        {
+            fprintf( stderr, "Illegal character: %c\n", *code );
+            exit( EXIT_FAILURE );
+        }
+        code++;
+        if ( *code == '\0' )
+        {
+            fprintf( stderr, "Stray character at end of line: %c\n", *(code-1) );
+            exit( EXIT_FAILURE );
+        }
+        lo = asxhex( *code );
+        if ( lo < 0 )
+        {
+            fprintf( stderr, "Illegal character: %c\n", *code );
+            exit( EXIT_FAILURE );
+        }
+        code++;
+        elfram[mem_addr++] = ( hi << 4 ) | lo;
+    }
     return 0;
 }
 
@@ -510,10 +551,12 @@ void show_help( const char *name )
 {
     printf( "\nUsage: %s [-f file -h file -H -s -v] [code]\n", name );
     puts( "Options:" );
+    puts( "  -b file   Load binary file into 1802 memory" );
+    puts( "  -d        Dump 256 bytes of 1802 memory at end of program" );
     puts( "  -f file   Load file into 1802 memory" );
     puts( "  -h file   Load Intel hex fileinto1802 memory" );
     puts( "  -H        Show this help" );
-    puts( "  -s speed  Set clocki speed to speed" );
+    puts( "  -s speed  Set clock speed to speed" );
     puts( "  -v        Show version information" );
 }
 
