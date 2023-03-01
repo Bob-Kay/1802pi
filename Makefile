@@ -1,5 +1,5 @@
 CC      = gcc
-DEBUG   = -ggdb
+DEBUG   = -ggdb -O0
 NOCRYPT =
 OPT     = -O
 PROF    =
@@ -17,7 +17,7 @@ $(BINARY): $(O_FILES)
 	$(CC) $(LFLAGS) $(LDFLAGS) -o $(BINARY) $(O_FILES) $(LIBS)
 
 .c.o:
-	$(CC) -c $(C_FLAGS) $< -o $@
+	$(CC) -c $(CFLAGS) $< -o $@
 
 clean:
 	@rm -rf $(BINARY) $(O_FILES)

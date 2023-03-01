@@ -1,4 +1,5 @@
-
+#include <ctype.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -74,23 +75,30 @@ typedef unsigned char boolean;
 // struct { time_t tv_sec, longtv_usec } timeval;
 
 // Global variables
-int clocks_per_second = 10000;
-struct timespec timeCycle;		// Duration of a half clock cycle;
-struct timespec timeMark;		// Time of last clock edge
+int clocks_per_second = 1000;
+uint16_t mem_addr;
+struct timespec timeCycle;				// Duration of a half clock cycle;
+struct timespec timeMark;				// Time of last clock edge
 
-byte elfram[65536];				// Elf memory
+byte elfram[65536];						// Elf memory
 
-void clockPulse( void );		// Send one clock cycle
-void clockEdge( int dir );		// Send one half clock pulse
-void db_in( void );				// Set data bus pins to INPUT
-void db_out( void );			// Set data bus pins to OUTPUT
-int exec_cycle( void );			// Execute one machine cucle (8 clocks)
+int asxhex(int c );						// ConvertASCII hex character to binary
+void clockPulse( void );				// Send one clock cycle
+void clockEdge( int dir );				// Send one half clock pulse
+int exec_cycle( void );					// Execute one machine cucle (8 clocks)
 void get_options( int argc, char **argv ); // Get command line args
-void init_1802_pins( void );	// Initialize 1802 pins
-unsigned read_addr( void );		// Read 8 bits of address from address lines
+void init_1802_pins( void );			// Initialize 1802 pins
+int load_binary( const char *fname ); 	// Load a binary file
+int load_file( const char *fname );		// Load a data file
+int load_hex( const char *fname );		// Load an Intel hex file
+int next_byte( const char *p );			// Get bext ASCII hex byte from string
+void ramdump( int addr, int range );	// Dump 1802 memory to screen
+unsigned read_addr( void );				// Read 8 bits of address from address lines
+void set_db_in( void );					// Set data bus pins to INPUT
+void set_db_out( void );				// Set data bus pins to OUTPUT
 void show_help( const char *name );		// Display help message
 void show_version( const char *name );	// Display program version
-void sync( void );
+void csync( void );
 
 int main( int argc, char *argv[] )
 {
@@ -110,19 +118,33 @@ int main( int argc, char *argv[] )
 
     for ( int i = 0; i < 1000; i++ ) // Loop forever (terminate with Ctrl-C)
     {
-        sync( );
+        csync( );
         digitalWrite( nClock, HIGH );
-        sync( );
+        csync( );
         digitalWrite( nClock, LOW );
 //        puts( "Tick!" );
     }    
 
+    ramdump( 0, 256 );
+
     exit( EXIT_SUCCESS );
+}
+
+// Convert one ASCII character to hex
+int asxhex( int c )
+{
+    if ( c >= '0' && c <= '9' )
+        return c - '0';
+    if ( c >= 'A' && c <= 'F' )
+        return c - 'A' + 10;
+    if ( c >= 'a' && c <= 'f' )
+        return c - 'a' + 10;
+    return -1;
 }
 
 void clockEdge( int dir )
 {
-    sync( );
+    csync( );
     digitalWrite( nClock, dir ? HIGH : LOW );
 }
 
@@ -132,38 +154,10 @@ void clockPulse( void )
     clockEdge( LOW );
 }
 
-/* We can't truly set the data bus to tristate ( unless there's something in WiringPi
-   I'm unaware of). So we'll normally set the bus to INPUT and set it to OUTPUT
-   when necessary (controlled by nMRD from the 1802).
-*/
-void db_in( void )
-{
-    pinMode( DB0, INPUT );
-    pinMode( DB1, INPUT );
-    pinMode( DB2, INPUT );
-    pinMode( DB3, INPUT );
-    pinMode( DB4, INPUT );
-    pinMode( DB5, INPUT );
-    pinMode( DB6, INPUT );
-    pinMode( DB7, INPUT );
-}
-
-void db_out( void )
-{
-    pinMode( DB0, OUTPUT );
-    pinMode( DB1, OUTPUT );
-    pinMode( DB2, OUTPUT );
-    pinMode( DB3, OUTPUT );
-    pinMode( DB4, OUTPUT );
-    pinMode( DB5, OUTPUT );
-    pinMode( DB6, OUTPUT );
-    pinMode( DB7, OUTPUT );
-}
-
 // execute one 8-clock machine cycle
 int exec_cycle( void )
 {
-    uint mem_addr;
+//    uint mem_addr;
     // Wait for TPA to go high, latch address
     do
     {
@@ -171,7 +165,7 @@ int exec_cycle( void )
         clockEdge( LOW );
     } while ( digitalRead( TPA ) == LOW );
     // Read address lines and set high address
-    mem_addr = read_addr( ) << 8;
+//    mem_addr = read_addr( ) << 8;
     return 0;
 }
 
@@ -182,20 +176,32 @@ void get_options( int argc, char **argv )
     boolean fVersion = FALSE;
     const char *binname;
 
+    // Strip any path information from filename
     if ( ( binname = strrchr( argv[0], DIR_SEPARATOR ) ) != NULL )
         binname++;
     else
         binname = argv[0];
 
-    while ( ( option = getopt( argc, argv, "f:h:Hs:v" ) ) != EOF )
+    while ( ( option = getopt( argc, argv, "b:f:h:Hs:v" ) ) != EOF )
     {
         switch( option )
         {
+            case 'b':
+                load_binary( optarg );
+                break;
+            case 'f':
+                load_file( optarg );
+                break;
+            case 'h':
+                load_hex( optarg );
+                break;
             case 'H':
                 if ( !fHelp )
+                {
                     show_help( binname );
                     fHelp = TRUE;
-                    break;
+                }
+                break;
             case 'v':
                 if ( !fVersion )
                     show_version( binname );
@@ -233,10 +239,228 @@ void init_1802_pins( void )
     pinMode( MA7, INPUT );
 */
     // Data bus will normally be input, set to output when needed
-    db_in( );
+    set_db_in( );
     
     clockEdge( LOW );				// Start clock low
     digitalWrite( nClear, LOW );	// Start 1802 in reset
+}
+
+int load_binary( const char *fname )
+{
+    FILE *fp;
+    uint16_t addr;
+    int c;
+
+    if ( ( fp = fopen( fname, "rb" ) ) == NULL )
+    {
+        perror( fname );
+        exit( EXIT_FAILURE );
+    }
+    addr = mem_addr;
+    while ( ( c = fgetc( fp ) ) != EOF )
+        elfram[addr++] = c;
+
+    fclose( fp );    
+    return 0;
+}
+
+// Load a data file.  The file is a stream of 2-char hex digits.  An optional colon precedes
+// four hex chars interpreted as a memory address.  Whitespace is ignored except between digits
+// of a byte.
+// NOTE: Does not yet support embedded address fields
+int load_file( const char *fname )
+{
+    FILE *fp;
+    int c;
+    int hi;
+    int lo;
+
+    if ( ( fp = fopen( fname, "rb" ) ) == NULL )
+    {
+        perror( fname );
+        exit( EXIT_FAILURE );
+    }
+    while ( ( c = fgetc( fp ) ) != EOF )
+    {
+        if ( isspace( c ) )
+            continue;
+        hi = asxhex( c );
+        if ( hi < 0 )
+        {
+            fprintf( stderr, "%s: illegal character %c\n", fname, c );
+            fclose( fp );
+            exit( EXIT_FAILURE );
+        }
+        if ( ( c = fgetc( fp )) == EOF )
+        {
+            fprintf( stderr, "%s: unexpected EOF\n", fname );
+            fclose( fp );
+            exit( EXIT_FAILURE );
+        }
+
+        lo = asxhex( c );
+        if ( lo < 0 )
+        {
+            fprintf( stderr, "%s: illegal character %c\n", fname, c );
+            fclose( fp );
+            exit( EXIT_FAILURE );
+        }
+        elfram[mem_addr++] = ( hi << 4 ) | lo;
+    }
+    fclose( fp );
+    return 0;
+}
+
+//	Load an Intel hex format file
+/*	File format:
+    leading garbage !=':' is legal!
+    : colon
+    1-byte count of data bytes to follow
+    2-byte address
+    1-byte record type  00 = data, 01 = eof, all others ignored.
+    Data bytes
+    1-byte checksum
+*/
+int load_hex( const char *fname )
+{
+    FILE *fp;
+    int addr;
+    char buf[512];	// line buffer
+    int csum;		// checksum
+    int count;		// count of data bytes to read from record
+    int n;
+    char *p;
+    int i;
+
+    if ( ( fp = fopen( fname, "rb" ) ) == NULL )
+    {
+        perror( fname );
+        exit( EXIT_FAILURE );
+    }
+    while ( ( fgets( buf, sizeof( buf), fp ) ) != NULL )
+    {
+        puts( buf );
+        if ( buf[0] == '#' )	// Extension to spec:
+            continue;			// Allow comments prefixed by '#'
+        csum = 0;
+        count = 0;
+        addr = 0;
+        p = buf;
+        if ( *p != ':' )
+        {
+            char *q;
+            if ( ( q = strchr( p, '\n' ) ) != NULL )
+                *q = '\0';
+            fprintf( stderr, "Bad data:\n \"%s\"\n", buf );
+            fclose( fp );
+            exit( EXIT_FAILURE );
+        }
+        p++;
+        // get byte count
+        n = next_byte( p );
+        csum += n;
+        p += 2;
+        count = n;
+        // get address
+        n = next_byte( p );
+        csum += n;
+        p += 2;
+        addr = n << 8;
+        n = next_byte( p );
+        csum += n;
+        p += 2;
+        addr += n;
+        // get record type
+        n = next_byte( p );
+        csum += n;
+        p += 2;
+        if ( n != '\0' )
+            continue;	// ignore any record that's not data
+        // read data bytes and store in vram
+        mem_addr = addr;
+        for ( i = 0; i < count; i++ )
+        {
+            n = next_byte( p );
+            csum += n;
+            p += 2;
+            elfram[mem_addr++] = n;
+        }
+        // read checksum
+        n = next_byte( p );
+        csum += n;
+        csum &= 0xFF;
+        if ( csum != 0 )
+        {
+            char *q;
+            if ( ( q = strchr( buf, '\n' ) ) != NULL )
+                *q = '\0';
+            fprintf( stderr, "Bad checksum in:\n\"%s\"\n", buf );
+            fclose( fp );
+            exit( EXIT_FAILURE );
+        }
+    }
+
+    fclose( fp );
+    return 0;
+}
+
+int next_byte( const char *p )
+{
+    int hi;
+    int lo;
+
+    hi = asxhex( *p );
+    if ( hi < 0 )
+    {
+        fprintf( stderr, "Bad char '%c' in hex file.\n", *p );
+        fcloseall( );
+        exit( EXIT_FAILURE );
+    }
+    lo = asxhex( *(p+1) );
+    if ( lo < 0 )
+    {
+        fprintf( stderr, "Bad char '%c' in hex file.\n", *p );
+        fcloseall( );
+        exit( EXIT_FAILURE );
+    }
+    return ( hi << 4 ) + lo;
+}
+
+void ramdump( int start, int range )
+{
+    int addr;
+    char buf[81];
+    byte c;
+    int i;
+    char *p;
+
+    addr = start;
+    for ( int l = 0; l < 8; l++ )		// For now, just print 8 lines of 16 bytes
+    {
+        p = buf;
+        p += sprintf( p, "%04X:", addr );
+        for ( i = 0; i < 16; i++ )
+        {
+            if ( ( i & 1 ) == 0 )
+                *p++ = ' ';
+            if ( i  ==  8 )
+                *p++ = ' ';
+            p += sprintf( p, "%02X", elfram[addr+i] );
+        }
+        *p++ = ' ';
+        *p++ = ' ';
+        for ( i = 0; i < 16; i++ )
+        {
+            c = elfram[addr + i];
+            if ( ( c < 0x20 ) || ( c > 0x7E ) )
+                *p++ = '.';
+            else
+                *p++ = c;
+        }
+        *p++ = '\0';
+        puts( buf );
+        addr += 16;
+    }
 }
 
 unsigned read_addr( void )
@@ -251,6 +475,34 @@ unsigned read_addr( void )
     addr |= digitalRead( MA6 ) << 6;
     addr |= digitalRead( MA7 ) << 7;
     return addr;
+}
+
+/* We can't truly set the data bus to tristate ( unless there's something in WiringPi
+   I'm unaware of). So we'll normally set the bus to INPUT and set it to OUTPUT
+   when necessary (controlled by nMRD from the 1802).
+*/
+void set_db_in( void )
+{
+    pinMode( DB0, INPUT );
+    pinMode( DB1, INPUT );
+    pinMode( DB2, INPUT );
+    pinMode( DB3, INPUT );
+    pinMode( DB4, INPUT );
+    pinMode( DB5, INPUT );
+    pinMode( DB6, INPUT );
+    pinMode( DB7, INPUT );
+}
+
+void set_db_out( void )
+{
+    pinMode( DB0, OUTPUT );
+    pinMode( DB1, OUTPUT );
+    pinMode( DB2, OUTPUT );
+    pinMode( DB3, OUTPUT );
+    pinMode( DB4, OUTPUT );
+    pinMode( DB5, OUTPUT );
+    pinMode( DB6, OUTPUT );
+    pinMode( DB7, OUTPUT );
 }
 
 void show_help( const char *name )
@@ -271,7 +523,7 @@ void show_version( const char *name )
 }
 
 // Wait until time for next clock edge, using clock_nanaosleep() and absolute time
-void sync( void )
+void csync( void )
 {
     int result;
     struct timespec timeNext;
@@ -299,3 +551,4 @@ void sync( void )
     clock_gettime( CLOCK_MONOTONIC, &timeMark );
 //   printf( "exit: %d.%9.9d\n", timeMark.tv_sec, timeMark.tv_nsec );
 }
+

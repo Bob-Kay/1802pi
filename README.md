@@ -5,6 +5,8 @@ This project uses a Raspberry Pi to emulate the ROM, RAM and peripherals thast m
 to a COSMAC 1802 processor chip.  It can be used for very low level analysis of what happens
 while running an 1802 program.
 
+This is a sister project of Bob Kucxewski's 1802/Raspberry Pi project.
+see https://github.com/BobKuczewski/Run1802.git
 ## Hardware
 All that's needed is an 1802 chip, a Raspberry Pi, and a breadboard/circuit board with the
 interconnections.  Power for the 1802 is supplied by the Pi.  Since the 1802 has a very low
