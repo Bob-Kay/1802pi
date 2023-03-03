@@ -121,6 +121,7 @@ int main( int argc, char *argv[] )
     // Send 32 clocks while in reset
     for ( int i = 0; i < 32; i++ )
         clockPulse( );
+    digitalWrite( nClear, HIGH );
 
     for ( clocks = 0; clocks < max_clocks; clocks++ )
     {
@@ -172,7 +173,8 @@ int exec_cycle( void )
         clockEdge( LOW );
     } while ( digitalRead( TPA ) == LOW );
     // Read address lines and set high address
-//    mem_addr = read_addr( ) << 8;
+    mem_addr = read_addr( ) << 8;
+    
     return 0;
 }
 
@@ -219,6 +221,7 @@ void get_options( int argc, char **argv )
                     fputs( "Bad value for max clocks\n", stderr );
                     exit( EXIT_FAILURE );
                 }
+                printf( " %d clock cycles\n", max_clocks );
                 break;
             case 'v':
                 if ( !fVersion )
@@ -227,7 +230,7 @@ void get_options( int argc, char **argv )
                 break;
             case 's':
                 clocks_per_second = atoi( optarg );
-                printf( " Speed set to %d\n", clocks_per_second );
+                printf( " Clock speed set to %d\n", clocks_per_second );
                 break;
             default:
                 abort( );
