@@ -1,5 +1,8 @@
 # 1802pi
 
+**Note:** This project is in a very early stage.
+At this time this does nothing more than toggle the 1802's clock pin.
+
 ## Purpose
 This project uses a Raspberry Pi to emulate the ROM, RAM and peripherals thast may be connected 
 to a COSMAC 1802 processor chip.  It can be used for very low level analysis of what happens
@@ -7,7 +10,7 @@ while running an 1802 program.
 
 This is a sister project of Bob Kucxewski's 1802/Raspberry Pi project.
 see https://github.com/BobKuczewski/Run1802.git  Discussion of these projects, and just about
-anything related to the RCA Cosmac 1802 processor family, can be found att
+anything related to the RCA Cosmac 1802 processor family, can be found at
 https://groups.io/g/cosmacelf
 
 ## Hardware
@@ -28,6 +31,7 @@ where options are:
     -f <file>          load file, see format below
     -h <hexfile>       load Intel hex format file
     -H help            Print help message and exit
+    -n <maxcycles>     Set max number of clock cycles to <maxcycles>
     -s speed           set clock speed, default to 500Hz if not specified.
 
 "code" is an optional arbitrary string of ASCII hex characters representing 1802 instructions 
