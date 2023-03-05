@@ -12,36 +12,35 @@
 #define VERSION_MAJOR	0		// Program version
 #define VERSION_MINOR	0
 
-// Pin assignments
-// 	name	WiringPi	   BCM		GPIO	  1802 
-#define nClock	29	//		21		40			 1
-#define nClear	28	//		20		38			 3
-#define TPA		25	//		26		37			34
-#define TPB		24	//		19		35			33
-#define SC0		27	//		16		36			 6
-#define nMrd	26	//		12		32			 7
-#define nMwr	23	//		13		33			35
-#define N2		 0	//		17		11			17
+//     name       WPi            GPIO    Phys   1802
+#define MA0        30      //       0      27     25
+#define MA1        31      //       1      28     26
+#define MA2         8      //       2       3     27
+#define MA3         9      //       3       5     28
+#define MA4         7      //       4       7     29
+#define MA5        21      //       5      29     30
+#define MA6        22      //       6      31     31
+#define MA7        11      //       7      26     32
 
-#define MA0		22	//		 6		31			25
-#define MA1		21	//		 5		29			26
-#define MA2		30	//		 0		27			27
-#define MA3		14	//		11		23			28
-#define MA4		13	//		 9		21		 	29
-#define MA5		12	//		10		19			30
-#define MA6		 3	//		22		15			31
-#define MA7		 2	//		27		13			32
+#define DB0        10      //       8      24     15
+#define DB1        13      //       9      21     14
+#define DB2        12      //      10      19     13
+#define DB3        14      //      11      23     12
+#define DB4        26      //      12      32     11
+#define DB5        23      //      13      33     10
+#define DB6        15      //      14       8      9
+#define DB7        16      //      15      10      8
 
-#define DB0		16	//		15	 	10			15
-#define DB1		 1	//		18	 	12			14 
-#define DB2		 4	//		23		16			13
-#define DB3		 5	//		24		18			12
-#define DB4		 6	//		25		22			11
-#define DB5		10	//		 8		24			10
-#define DB6		11	//		 7		26			 9
-#define DB7		31	//		 1		28			 8
+#define nClock      25     //      26      37      1
+#define nClear      24     //      19      35      3
+#define TPA          6     //      25      22     34
+#define TPB          5     //      24      18     33
+#define SC0          2     //      27      13      6
+#define nMrd         0     //      17      11      7
+#define nMwr        27     //      16      36     35
+#define N2           1     //      18      12     17
+#define Qout         3     //      22      15      4
 
-#define Qout	15	//		14		10			 4
 /*
 		Vcc		 -			 -		 1			16
 		Vss		 -			 -		 2			40
@@ -123,12 +122,13 @@ int main( int argc, char *argv[] )
         clockPulse( );
     digitalWrite( nClear, HIGH );
 
-    for ( clocks = 0; clocks < max_clocks; clocks++ )
+    while ( ( max_clocks == 0 ) || ( clocks < max_clocks ) )
     {
         csync( );
         digitalWrite( nClock, HIGH );
         csync( );
         digitalWrite( nClock, LOW );
+        clocks++;
 //        puts( "Tick!" );
     }    
 
@@ -184,6 +184,7 @@ void get_options( int argc, char **argv )
     boolean fHelp = FALSE;
     boolean fVersion = FALSE;
     const char *binname;
+    char lbuf[128];
 
     // Strip any path information from filename
     if ( ( binname = strrchr( argv[0], DIR_SEPARATOR ) ) != NULL )
@@ -216,12 +217,16 @@ void get_options( int argc, char **argv )
                 break;
             case 'n':
                 max_clocks = atoi( optarg );
-                if ( max_clocks < 1 )
+                if ( max_clocks < 0 )
                 {
                     fputs( "Bad value for max clocks\n", stderr );
                     exit( EXIT_FAILURE );
                 }
-                printf( " %d clock cycles\n", max_clocks );
+                if ( max_clocks )
+                    sprintf( lbuf, "%d", max_clocks );
+                else
+                    strcpy( lbuf, "Unlimited" );
+                printf( " %s clock cycles\n", lbuf );
                 break;
             case 'v':
                 if ( !fVersion )
@@ -570,7 +575,7 @@ void show_help( const char *name )
     puts( "  -f file   Load file into 1802 memory" );
     puts( "  -h file   Load Intel hex file into 1802 memory" );
     puts( "  -H        Show this help" );
-    puts( "  -n        Max clock cycles to execute" );
+    puts( "  -n        Max clock cycles to execute (0=unlimited)" );
     puts( "  -s speed  Set clock speed to speed" );
     puts( "  -v        Show version information" );
 }
@@ -583,6 +588,7 @@ void show_version( const char *name )
 // Wait until time for next clock edge, using clock_nanaosleep() and absolute time
 void csync( void )
 {
+#if 1
     int result;
     struct timespec timeNext;
     struct timespec timeRemain;
@@ -608,5 +614,6 @@ void csync( void )
     }
     clock_gettime( CLOCK_MONOTONIC, &timeMark );
 //   printf( "exit: %d.%9.9d\n", timeMark.tv_sec, timeMark.tv_nsec );
+#endif
 }
 
