@@ -31,8 +31,9 @@ where options are:
     -f <file>          load file, see format below
     -h <hexfile>       load Intel hex format file
     -H help            Print help message and exit
-    -n <maxcycles>     Set max number of clock cycles to <maxcycles>
+    -n <maxcycles>     Set max number of clock cycles to <maxcycles>, 0 = unlimited
     -s speed           set clock speed, default to 500Hz if not specified.
+    -v                 show version information
 
 "code" is an optional arbitrary string of ASCII hex characters representing 1802 instructions 
 and/or data.
@@ -43,7 +44,7 @@ zero if no address imformation is contained within the files.
 
 The format of files loaded with the -f option is a string of ASCII hex characters, for example:
 7B7A3000
-Case is not significant, "7b7a3000" would work as well.  If a characet is a colon ":" the 
+Case is not significant, "7b7a3000" would work as well.  If a characer is a colon ":" the 
 following four characters are considered a 16-bit address representing the memory adress where 
 the following bytes are written.  If no address is specified, the current value of the load 
 address counter is used.
